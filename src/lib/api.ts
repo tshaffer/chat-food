@@ -19,8 +19,14 @@ async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? `Request failed with status ${response.status}`);
+    const body = (await response.json().catch(() => null)) as
+      | { error?: string | { message?: string } }
+      | null;
+    const message =
+      typeof body?.error === "string"
+        ? body.error
+        : body?.error?.message ?? `Request failed with status ${response.status}`;
+    throw new Error(message);
   }
 
   if (response.status === 204) {

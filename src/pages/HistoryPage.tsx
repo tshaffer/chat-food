@@ -226,11 +226,13 @@ export function HistoryPage({ currentUser }: HistoryPageProps) {
         <aside className="card history-sidebar">
           {isLoading ? (
             <div className="empty-state compact">
-              <p>Loading history...</p>
+              <h2>Loading history</h2>
+              <p>Fetching saved daily totals for {currentUser.name}.</p>
             </div>
           ) : dailySummaries.length === 0 ? (
             <div className="empty-state compact">
-              <p>No entries found in this date range.</p>
+              <h2>No history in this range</h2>
+              <p>Try a wider date range or add an entry for one of these days.</p>
             </div>
           ) : (
             dailySummaries.map((summary) => (
@@ -366,7 +368,7 @@ export function HistoryPage({ currentUser }: HistoryPageProps) {
       {deleteTarget ? (
         <ConfirmDialog
           title="Delete Log Entry"
-          description={`Delete ${deleteTarget.food?.name ?? "this entry"} from ${deleteTarget.date}?`}
+          description={`Delete the ${deleteTarget.meal.toLowerCase()} entry for ${deleteTarget.food?.name ?? "this food"} on ${deleteTarget.date}?`}
           isPending={isDeleting}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={handleDeleteEntry}

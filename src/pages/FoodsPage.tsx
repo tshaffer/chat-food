@@ -123,11 +123,13 @@ export function FoodsPage() {
       <div className="card">
         {isLoading ? (
           <div className="empty-state compact">
-            <p>Loading foods...</p>
+            <h2>Loading foods</h2>
+            <p>Fetching the shared food list.</p>
           </div>
         ) : filteredFoods.length === 0 ? (
           <div className="empty-state compact">
-            <p>No foods match the current filter.</p>
+            <h2>No foods found</h2>
+            <p>{query ? "No foods match the current filter." : "Create the first shared food to start logging meals."}</p>
           </div>
         ) : (
           <div className="table-wrap">
@@ -187,7 +189,7 @@ export function FoodsPage() {
       {deleteTarget ? (
         <ConfirmDialog
           title="Delete Food"
-          description={`Delete ${deleteTarget.name}? This is blocked if the food is used in templates or log entries.`}
+          description={`Delete the shared food "${deleteTarget.name}"? This will only succeed if it is not referenced by any templates or log entries.`}
           isPending={isDeleting}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={handleDelete}

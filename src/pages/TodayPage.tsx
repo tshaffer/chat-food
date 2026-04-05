@@ -283,7 +283,8 @@ export function TodayPage({ currentUser }: TodayPageProps) {
 
       {isLoading ? (
         <div className="empty-state">
-          <p>Loading entries...</p>
+          <h2>Loading today&apos;s entries</h2>
+          <p>Fetching meals for {currentUser.name} on {formatDisplayDate(selectedDate)}.</p>
         </div>
       ) : enrichedEntries.length === 0 ? (
         <div className="empty-state">
@@ -368,7 +369,7 @@ export function TodayPage({ currentUser }: TodayPageProps) {
       {deleteTarget ? (
         <ConfirmDialog
           title="Delete Log Entry"
-          description={`Delete ${deleteTarget.food?.name ?? "this entry"} from ${deleteTarget.meal}?`}
+          description={`Delete the ${deleteTarget.meal.toLowerCase()} entry for ${deleteTarget.food?.name ?? "this food"} on ${deleteTarget.date}?`}
           isPending={isDeleting}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={handleDeleteEntry}

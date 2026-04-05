@@ -37,6 +37,12 @@ export interface TemplateWithItems extends Template {
   items: TemplateItem[];
 }
 
+export interface NutritionSnapshot {
+  calories: number;
+  protein: number;
+  fiber: number;
+}
+
 export interface LogEntry {
   id: string;
   userId: string;
@@ -46,6 +52,7 @@ export interface LogEntry {
   templateNameSnapshot: string | null;
   foodId: string;
   actualAmount: number;
+  nutritionSnapshot: NutritionSnapshot;
   createdAt: string;
   updatedAt: string;
 }

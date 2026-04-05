@@ -51,6 +51,11 @@ export function AddFromTemplateDialog({
   }
 
   async function handleSubmit() {
+    if (templates.length === 0) {
+      setValidationError("Create a template before using Add from Template.");
+      return;
+    }
+
     if (!formState.date) {
       setValidationError("Date is required.");
       return;
@@ -78,19 +83,25 @@ export function AddFromTemplateDialog({
   return (
     <Dialog
       title="Add from Template"
+      description="Use a saved template to create one log entry per template row."
       onClose={onCancel}
       actions={
         <>
           <button className="button button--secondary" type="button" onClick={onCancel}>
             Cancel
           </button>
-          <button className="button button--primary" type="button" onClick={() => void handleSubmit()} disabled={isSaving}>
+          <button
+            className="button button--primary"
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={isSaving || templates.length === 0}
+          >
             {isSaving ? "Adding..." : "Add Entries"}
           </button>
         </>
       }
     >
-      <div className="form-grid">
+      <div className="form-grid form-grid--dialog">
         <label>
           <span>Current User</span>
           <input value={currentUser.name} readOnly />
@@ -115,7 +126,7 @@ export function AddFromTemplateDialog({
         <label>
           <span>Template</span>
           <select value={formState.templateId} onChange={(event) => updateField("templateId", event.target.value)}>
-            <option value="">Select a template</option>
+            <option value="">{templates.length === 0 ? "No templates available" : "Select a template"}</option>
             {templates.map((template) => (
               <option key={template.id} value={template.id}>
                 {template.name}
@@ -179,11 +190,15 @@ export function AddFromTemplateDialog({
               </div>
             </>
           ) : (
-            <p className="nutrition-preview__meta">Select a template to preview the created entries.</p>
+            <p className="nutrition-preview__meta">
+              {templates.length === 0
+                ? "No templates are available for this user yet."
+                : "Select a template to preview the created entries."}
+            </p>
           )}
         </div>
 
-        {validationError || error ? <div className="form-error">{validationError || error}</div> : null}
+        {validationError || error ? <div className="form-error form-error--dialog">{validationError || error}</div> : null}
       </div>
     </Dialog>
   );

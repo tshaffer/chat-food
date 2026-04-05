@@ -24,6 +24,10 @@ interface TemplateDraft {
   items: TemplateItemInput[];
 }
 
+type PendingTemplateAction =
+  | { type: "new" }
+  | { type: "select"; template: TemplateWithItems };
+
 function makeBlankDraft(): TemplateDraft {
   return {
     id: null,
@@ -45,6 +49,7 @@ export function TemplatesPage({ currentUser }: TemplatesPageProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TemplateDraft | null>(null);
   const [isTemplateLogOpen, setIsTemplateLogOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingTemplateAction | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,6 +205,46 @@ export function TemplatesPage({ currentUser }: TemplatesPageProps) {
       })),
     });
     setFormError("");
+  }
+
+  function applyNewTemplateDraft() {
+    setSelectedId(null);
+    setDraft(makeBlankDraft());
+    setFormError("");
+  }
+
+  function attemptStartNew() {
+    if (isDirty) {
+      setPendingAction({ type: "new" });
+      return;
+    }
+
+    applyNewTemplateDraft();
+  }
+
+  function attemptSelectTemplate(template: TemplateWithItems) {
+    if (isDirty && template.id !== selectedId) {
+      setPendingAction({ type: "select", template });
+      return;
+    }
+
+    selectTemplate(template);
+  }
+
+  function runPendingAction() {
+    if (!pendingAction) {
+      return;
+    }
+
+    if (pendingAction.type === "new") {
+      applyNewTemplateDraft();
+    }
+
+    if (pendingAction.type === "select") {
+      selectTemplate(pendingAction.template);
+    }
+
+    setPendingAction(null);
   }
 
   function updateItem(index: number, patch: Partial<TemplateItemInput>) {
@@ -367,11 +412,7 @@ export function TemplatesPage({ currentUser }: TemplatesPageProps) {
             <button
               className="button button--primary"
               type="button"
-              onClick={() => {
-                setSelectedId(null);
-                setDraft(makeBlankDraft());
-                setFormError("");
-              }}
+              onClick={attemptStartNew}
             >
               New Template
             </button>
@@ -387,11 +428,13 @@ export function TemplatesPage({ currentUser }: TemplatesPageProps) {
           <div className="template-list">
             {isLoading ? (
               <div className="empty-state compact">
-                <p>Loading templates...</p>
+                <h2>Loading templates</h2>
+                <p>Fetching saved templates for {currentUser.name}.</p>
               </div>
             ) : filteredTemplates.length === 0 ? (
               <div className="empty-state compact">
-                <p>No templates found.</p>
+                <h2>No templates found</h2>
+                <p>{searchText ? "Try a different search." : "Create a reusable template to speed up logging."}</p>
               </div>
             ) : (
               filteredTemplates.map((template) => (
@@ -399,7 +442,7 @@ export function TemplatesPage({ currentUser }: TemplatesPageProps) {
                   key={template.id}
                   className={template.id === selectedId ? "template-list__item template-list__item--active" : "template-list__item"}
                   type="button"
-                  onClick={() => selectTemplate(template)}
+                  onClick={() => attemptSelectTemplate(template)}
                 >
                   <strong>{template.name}</strong>
                   <span>{template.items.length} foods</span>
@@ -448,6 +491,12 @@ export function TemplatesPage({ currentUser }: TemplatesPageProps) {
                   </button>
                 </div>
               </div>
+
+              {isDirty ? (
+                <div className="banner banner--warning">
+                  You have unsaved template changes. Save before switching templates if you want to keep them.
+                </div>
+              ) : null}
 
               {error ? <div className="banner banner--error">{error}</div> : null}
               {formError ? <div className="banner banner--error">{formError}</div> : null}
@@ -575,7 +624,7 @@ export function TemplatesPage({ currentUser }: TemplatesPageProps) {
       {deleteTarget ? (
         <ConfirmDialog
           title="Delete Template"
-          description={`Delete ${deleteTarget.name}? Existing log entries will be kept.`}
+          description={`Delete the template "${deleteTarget.name}"? Existing log entries will keep their saved template snapshot.`}
           isPending={isDeleting}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={handleDelete}
@@ -595,6 +644,23 @@ export function TemplatesPage({ currentUser }: TemplatesPageProps) {
             setFormError("");
           }}
           onSubmit={handleLogTemplate}
+        />
+      ) : null}
+
+      {pendingAction ? (
+        <ConfirmDialog
+          title="Discard Unsaved Template Changes"
+          description={
+            pendingAction.type === "new"
+              ? "Start a new template and discard the unsaved edits in the current draft?"
+              : `Switch to ${pendingAction.template.name} and discard the unsaved edits in the current draft?`
+          }
+          confirmLabel="Discard Changes"
+          isPending={false}
+          onCancel={() => setPendingAction(null)}
+          onConfirm={async () => {
+            runPendingAction();
+          }}
         />
       ) : null}
     </section>

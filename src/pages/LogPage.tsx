@@ -266,11 +266,13 @@ export function LogPage({ currentUser }: LogPageProps) {
       <div className="card">
         {isLoading ? (
           <div className="empty-state compact">
-            <p>Loading log entries...</p>
+            <h2>Loading log entries</h2>
+            <p>Fetching saved entries for {currentUser.name}.</p>
           </div>
         ) : filteredEntries.length === 0 ? (
           <div className="empty-state compact">
-            <p>No log entries match the current filters.</p>
+            <h2>No matching log entries</h2>
+            <p>Adjust the filters or add a new food entry.</p>
           </div>
         ) : (
           <div className="table-wrap">
@@ -381,7 +383,7 @@ export function LogPage({ currentUser }: LogPageProps) {
       {deleteTarget ? (
         <ConfirmDialog
           title="Delete Log Entry"
-          description={`Delete ${deleteTarget.food?.name ?? "this entry"} from ${deleteTarget.date}?`}
+          description={`Delete the ${deleteTarget.meal.toLowerCase()} entry for ${deleteTarget.food?.name ?? "this food"} on ${deleteTarget.date}?`}
           isPending={isDeleting}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={handleDeleteEntry}

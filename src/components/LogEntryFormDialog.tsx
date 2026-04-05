@@ -96,6 +96,11 @@ export function LogEntryFormDialog({
   return (
     <Dialog
       title={entry ? "Edit Food Entry" : "Add Food Entry"}
+      description={
+        entry
+          ? "Update the food, amount, meal, or date for this entry."
+          : "Create a single food entry for the selected user and meal."
+      }
       onClose={onCancel}
       actions={
         <>
@@ -123,7 +128,7 @@ export function LogEntryFormDialog({
         </>
       }
     >
-      <div className="form-grid">
+      <div className="form-grid form-grid--dialog">
         <label>
           <span>Current User</span>
           <input value={currentUser.name} readOnly />
@@ -197,7 +202,7 @@ export function LogEntryFormDialog({
           ) : null}
         </div>
 
-        {validationError || error ? <div className="form-error">{validationError || error}</div> : null}
+        {validationError || error ? <div className="form-error form-error--dialog">{validationError || error}</div> : null}
       </div>
     </Dialog>
   );

@@ -21,6 +21,7 @@ interface FoodFormDialogProps {
 
 export function FoodFormDialog({ food, isSaving, error, onCancel, onSubmit }: FoodFormDialogProps) {
   const [formState, setFormState] = useState<FoodInput>(emptyForm);
+  const [validationError, setValidationError] = useState("");
 
   useEffect(() => {
     if (food) {
@@ -35,6 +36,7 @@ export function FoodFormDialog({ food, isSaving, error, onCancel, onSubmit }: Fo
     } else {
       setFormState(emptyForm);
     }
+    setValidationError("");
   }, [food]);
 
   function updateNumberField(field: keyof FoodInput, value: string) {
@@ -46,12 +48,39 @@ export function FoodFormDialog({ food, isSaving, error, onCancel, onSubmit }: Fo
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!formState.name.trim()) {
+      setValidationError("Food name is required.");
+      return;
+    }
+
+    if (!formState.unitType.trim()) {
+      setValidationError("Unit type is required.");
+      return;
+    }
+
+    if (!(formState.unitQuantity > 0)) {
+      setValidationError("Unit quantity must be greater than 0.");
+      return;
+    }
+
+    if (formState.caloriesPerUnit < 0 || formState.proteinPerUnit < 0 || formState.fiberPerUnit < 0) {
+      setValidationError("Nutrition values cannot be negative.");
+      return;
+    }
+
+    setValidationError("");
     await onSubmit(formState);
   }
 
   return (
     <Dialog
       title={food ? "Edit Food" : "Add Food"}
+      description={
+        food
+          ? "Update the shared food definition used across templates and logs."
+          : "Create a shared food that all users can log."
+      }
       onClose={onCancel}
       actions={
         <>
@@ -64,7 +93,7 @@ export function FoodFormDialog({ food, isSaving, error, onCancel, onSubmit }: Fo
         </>
       }
     >
-      <form id="food-form" className="form-grid" onSubmit={handleSubmit}>
+      <form id="food-form" className="form-grid form-grid--dialog" onSubmit={handleSubmit}>
         <label>
           <span>Food</span>
           <input
@@ -128,7 +157,7 @@ export function FoodFormDialog({ food, isSaving, error, onCancel, onSubmit }: Fo
           />
         </label>
 
-        {error ? <div className="form-error">{error}</div> : null}
+        {validationError || error ? <div className="form-error form-error--dialog">{validationError || error}</div> : null}
       </form>
     </Dialog>
   );

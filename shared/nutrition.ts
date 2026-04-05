@@ -1,4 +1,4 @@
-import type { Food } from "./types.js";
+import type { Food, NutritionSnapshot } from "./types.js";
 
 export interface NutritionTotals {
   calories: number;
@@ -28,5 +28,13 @@ export function sumNutrition(totals: NutritionTotals[]): NutritionTotals {
 }
 
 export function roundNutritionValue(value: number): number {
-  return Math.round(value * 10) / 10;
+  return Math.round((value + Number.EPSILON) * 10) / 10;
+}
+
+export function roundNutritionTotals(totals: NutritionTotals): NutritionSnapshot {
+  return {
+    calories: roundNutritionValue(totals.calories),
+    protein: roundNutritionValue(totals.protein),
+    fiber: roundNutritionValue(totals.fiber),
+  };
 }

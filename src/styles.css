@@ -445,6 +445,11 @@ button {
   border-radius: 12px;
 }
 
+.banner--warning {
+  background: #fff6db;
+  color: #8a5b00;
+}
+
 .banner--error,
 .form-error {
   background: var(--danger-soft);
@@ -479,6 +484,17 @@ button {
   border-bottom: 1px solid var(--border);
 }
 
+.dialog__title-group {
+  display: grid;
+  gap: 4px;
+}
+
+.dialog__description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
 .dialog__body {
   padding: 20px;
 }
@@ -505,6 +521,10 @@ button {
 .form-grid label {
   display: grid;
   gap: 6px;
+}
+
+.form-grid--dialog {
+  align-items: start;
 }
 
 .nutrition-preview {
@@ -544,6 +564,10 @@ button {
   grid-column: 1 / -1;
   padding: 12px;
   border-radius: 12px;
+}
+
+.form-error--dialog {
+  margin-top: 4px;
 }
 
 @media (max-width: 960px) {
