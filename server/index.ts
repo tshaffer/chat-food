@@ -1,0 +1,458 @@
+import cors from "cors";
+import express from "express";
+import { calculateNutrition, roundNutritionValue } from "../shared/nutrition.js";
+import type {
+  Food,
+  FoodInput,
+  LogEntry,
+  Meal,
+  Template,
+  User,
+  UserInput,
+} from "../shared/types.js";
+import { createId, readDatabase, writeDatabase } from "./store.js";
+
+const app = express();
+const port = Number(process.env.PORT ?? 3001);
+
+app.use(cors());
+app.use(express.json());
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function badRequest(message: string) {
+  return { error: message };
+}
+
+function validateUserInput(input: unknown): input is UserInput {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+
+  return isNonEmptyString((input as UserInput).name);
+}
+
+function validateFoodInput(input: unknown): input is FoodInput {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+
+  const candidate = input as FoodInput;
+
+  return (
+    isNonEmptyString(candidate.name) &&
+    isNonEmptyString(candidate.unitType) &&
+    isFiniteNumber(candidate.unitQuantity) &&
+    isFiniteNumber(candidate.caloriesPerUnit) &&
+    isFiniteNumber(candidate.proteinPerUnit) &&
+    isFiniteNumber(candidate.fiberPerUnit)
+  );
+}
+
+function sanitizeFoodInput(input: FoodInput): FoodInput {
+  return {
+    name: input.name.trim(),
+    unitType: input.unitType.trim(),
+    unitQuantity: input.unitQuantity,
+    caloriesPerUnit: input.caloriesPerUnit,
+    proteinPerUnit: input.proteinPerUnit,
+    fiberPerUnit: input.fiberPerUnit,
+  };
+}
+
+function serializeFood(food: Food) {
+  return {
+    ...food,
+    nutritionPerUnit: {
+      calories: roundNutritionValue(food.caloriesPerUnit),
+      protein: roundNutritionValue(food.proteinPerUnit),
+      fiber: roundNutritionValue(food.fiberPerUnit),
+    },
+  };
+}
+
+function getMeals(): Meal[] {
+  return ["Breakfast", "Lunch", "Dinner", "Snack"];
+}
+
+app.get("/api/health", (_request, response) => {
+  response.json({ ok: true });
+});
+
+app.get("/api/users", async (_request, response) => {
+  const database = await readDatabase();
+  response.json(database.users);
+});
+
+app.post("/api/users", async (request, response) => {
+  if (!validateUserInput(request.body)) {
+    response.status(400).json(badRequest("A unique username is required."));
+    return;
+  }
+
+  const database = await readDatabase();
+  const name = request.body.name.trim();
+  const existing = database.users.find((user) => user.name.toLowerCase() === name.toLowerCase());
+
+  if (existing) {
+    response.status(409).json(badRequest("Username must be unique."));
+    return;
+  }
+
+  const user: User = { id: createId("user"), name };
+  database.users.push(user);
+  await writeDatabase(database);
+  response.status(201).json(user);
+});
+
+app.get("/api/foods", async (_request, response) => {
+  const database = await readDatabase();
+  response.json(database.foods.map(serializeFood));
+});
+
+app.post("/api/foods", async (request, response) => {
+  if (!validateFoodInput(request.body)) {
+    response.status(400).json(badRequest("Food input is invalid."));
+    return;
+  }
+
+  const input = sanitizeFoodInput(request.body);
+  const now = new Date().toISOString();
+  const database = await readDatabase();
+
+  const food: Food = {
+    id: createId("food"),
+    ...input,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  database.foods.push(food);
+  await writeDatabase(database);
+  response.status(201).json(serializeFood(food));
+});
+
+app.put("/api/foods/:id", async (request, response) => {
+  if (!validateFoodInput(request.body)) {
+    response.status(400).json(badRequest("Food input is invalid."));
+    return;
+  }
+
+  const database = await readDatabase();
+  const food = database.foods.find((item) => item.id === request.params.id);
+
+  if (!food) {
+    response.status(404).json(badRequest("Food not found."));
+    return;
+  }
+
+  Object.assign(food, sanitizeFoodInput(request.body), {
+    updatedAt: new Date().toISOString(),
+  });
+
+  await writeDatabase(database);
+  response.json(serializeFood(food));
+});
+
+app.delete("/api/foods/:id", async (request, response) => {
+  const database = await readDatabase();
+  const isReferencedByTemplate = database.templateItems.some((item) => item.foodId === request.params.id);
+  const isReferencedByLog = database.logEntries.some((item) => item.foodId === request.params.id);
+
+  if (isReferencedByTemplate || isReferencedByLog) {
+    response.status(409).json(badRequest("Food cannot be deleted because it is in use."));
+    return;
+  }
+
+  const nextFoods = database.foods.filter((food) => food.id !== request.params.id);
+
+  if (nextFoods.length === database.foods.length) {
+    response.status(404).json(badRequest("Food not found."));
+    return;
+  }
+
+  database.foods = nextFoods;
+  await writeDatabase(database);
+  response.status(204).send();
+});
+
+app.get("/api/users/:userId/templates", async (request, response) => {
+  const database = await readDatabase();
+  const templates = database.templates
+    .filter((template) => template.userId === request.params.userId)
+    .map((template) => ({
+      ...template,
+      items: database.templateItems
+        .filter((item) => item.templateId === template.id)
+        .sort((left, right) => left.lineNumber - right.lineNumber),
+    }));
+
+  response.json(templates);
+});
+
+app.post("/api/users/:userId/templates", async (request, response) => {
+  const database = await readDatabase();
+  const user = database.users.find((item) => item.id === request.params.userId);
+
+  if (!user) {
+    response.status(404).json(badRequest("User not found."));
+    return;
+  }
+
+  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+  if (!name) {
+    response.status(400).json(badRequest("Template name is required."));
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const template: Template = {
+    id: createId("template"),
+    userId: user.id,
+    name,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  database.templates.push(template);
+  await writeDatabase(database);
+  response.status(201).json({ ...template, items: [] });
+});
+
+app.put("/api/templates/:id", async (request, response) => {
+  const database = await readDatabase();
+  const template = database.templates.find((item) => item.id === request.params.id);
+
+  if (!template) {
+    response.status(404).json(badRequest("Template not found."));
+    return;
+  }
+
+  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+  if (!name) {
+    response.status(400).json(badRequest("Template name is required."));
+    return;
+  }
+
+  template.name = name;
+  template.updatedAt = new Date().toISOString();
+  await writeDatabase(database);
+
+  const items = database.templateItems
+    .filter((item) => item.templateId === template.id)
+    .sort((left, right) => left.lineNumber - right.lineNumber);
+
+  response.json({ ...template, items });
+});
+
+app.delete("/api/templates/:id", async (request, response) => {
+  const database = await readDatabase();
+  const nextTemplates = database.templates.filter((template) => template.id !== request.params.id);
+
+  if (nextTemplates.length === database.templates.length) {
+    response.status(404).json(badRequest("Template not found."));
+    return;
+  }
+
+  database.templates = nextTemplates;
+  database.templateItems = database.templateItems.filter((item) => item.templateId !== request.params.id);
+  await writeDatabase(database);
+  response.status(204).send();
+});
+
+app.get("/api/users/:userId/log-entries", async (request, response) => {
+  const database = await readDatabase();
+  const { startDate, endDate } = request.query;
+  const entries = database.logEntries.filter((entry) => {
+    if (entry.userId !== request.params.userId) {
+      return false;
+    }
+
+    if (typeof startDate === "string" && entry.date < startDate) {
+      return false;
+    }
+
+    if (typeof endDate === "string" && entry.date > endDate) {
+      return false;
+    }
+
+    return true;
+  });
+
+  response.json(
+    entries.map((entry) => {
+      const food = database.foods.find((item) => item.id === entry.foodId);
+      const nutrition = food ? calculateNutrition(food, entry.actualAmount) : null;
+
+      return {
+        ...entry,
+        food,
+        nutrition: nutrition
+          ? {
+              calories: roundNutritionValue(nutrition.calories),
+              protein: roundNutritionValue(nutrition.protein),
+              fiber: roundNutritionValue(nutrition.fiber),
+            }
+          : null,
+      };
+    }),
+  );
+});
+
+app.post("/api/users/:userId/log-entries", async (request, response) => {
+  const database = await readDatabase();
+  const meal = request.body?.meal;
+  const foodId = request.body?.foodId;
+  const actualAmount = request.body?.actualAmount;
+  const date = request.body?.date;
+
+  if (
+    !isNonEmptyString(date) ||
+    !getMeals().includes(meal) ||
+    !isNonEmptyString(foodId) ||
+    !isFiniteNumber(actualAmount)
+  ) {
+    response.status(400).json(badRequest("Log entry input is invalid."));
+    return;
+  }
+
+  const user = database.users.find((item) => item.id === request.params.userId);
+  const food = database.foods.find((item) => item.id === foodId);
+
+  if (!user || !food) {
+    response.status(404).json(badRequest("User or food not found."));
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const logEntry: LogEntry = {
+    id: createId("entry"),
+    userId: user.id,
+    date,
+    meal,
+    templateId: null,
+    templateNameSnapshot: null,
+    foodId: food.id,
+    actualAmount,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  database.logEntries.push(logEntry);
+  await writeDatabase(database);
+  response.status(201).json(logEntry);
+});
+
+app.put("/api/log-entries/:id", async (request, response) => {
+  const database = await readDatabase();
+  const entry = database.logEntries.find((item) => item.id === request.params.id);
+
+  if (!entry) {
+    response.status(404).json(badRequest("Log entry not found."));
+    return;
+  }
+
+  const meal = request.body?.meal;
+  const foodId = request.body?.foodId;
+  const actualAmount = request.body?.actualAmount;
+  const date = request.body?.date;
+
+  if (
+    !isNonEmptyString(date) ||
+    !getMeals().includes(meal) ||
+    !isNonEmptyString(foodId) ||
+    !isFiniteNumber(actualAmount)
+  ) {
+    response.status(400).json(badRequest("Log entry input is invalid."));
+    return;
+  }
+
+  const food = database.foods.find((item) => item.id === foodId);
+  if (!food) {
+    response.status(404).json(badRequest("Food not found."));
+    return;
+  }
+
+  entry.date = date;
+  entry.meal = meal;
+  entry.foodId = foodId;
+  entry.actualAmount = actualAmount;
+  entry.updatedAt = new Date().toISOString();
+
+  await writeDatabase(database);
+  response.json(entry);
+});
+
+app.delete("/api/log-entries/:id", async (request, response) => {
+  const database = await readDatabase();
+  const nextEntries = database.logEntries.filter((entry) => entry.id !== request.params.id);
+
+  if (nextEntries.length === database.logEntries.length) {
+    response.status(404).json(badRequest("Log entry not found."));
+    return;
+  }
+
+  database.logEntries = nextEntries;
+  await writeDatabase(database);
+  response.status(204).send();
+});
+
+app.post("/api/users/:userId/log-entries/from-template", async (request, response) => {
+  const database = await readDatabase();
+  const user = database.users.find((item) => item.id === request.params.userId);
+  const template = database.templates.find((item) => item.id === request.body?.templateId && item.userId === request.params.userId);
+  const date = request.body?.date;
+  const meal = request.body?.meal;
+  const multiplier = request.body?.multiplier;
+
+  if (!user || !template) {
+    response.status(404).json(badRequest("User or template not found."));
+    return;
+  }
+
+  if (!isNonEmptyString(date) || !getMeals().includes(meal) || !isFiniteNumber(multiplier)) {
+    response.status(400).json(badRequest("Template logging input is invalid."));
+    return;
+  }
+
+  const items = database.templateItems
+    .filter((item) => item.templateId === template.id)
+    .sort((left, right) => left.lineNumber - right.lineNumber);
+
+  const now = new Date().toISOString();
+  const createdEntries = items.flatMap((item): LogEntry[] => {
+    const food = database.foods.find((candidate) => candidate.id === item.foodId);
+    if (!food) {
+      return [];
+    }
+
+    return [
+      {
+        id: createId("entry"),
+        userId: user.id,
+        date,
+        meal,
+        templateId: template.id,
+        templateNameSnapshot: template.name,
+        foodId: food.id,
+        actualAmount: item.defaultAmount * multiplier,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+  });
+
+  database.logEntries.push(...createdEntries);
+  await writeDatabase(database);
+  response.status(201).json(createdEntries);
+});
+
+app.listen(port, () => {
+  console.log(`Food Tracker API listening on http://localhost:${port}`);
+});

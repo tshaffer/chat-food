@@ -1,0 +1,55 @@
+{
+  "users": [
+    { "id": "user_1", "name": "Ted" },
+    { "id": "user_2", "name": "Alex" }
+  ],
+  "foods": [
+    {
+      "id": "food_1",
+      "name": "Greek Yogurt",
+      "unitQuantity": 170,
+      "unitType": "g",
+      "caloriesPerUnit": 100,
+      "proteinPerUnit": 17,
+      "fiberPerUnit": 0,
+      "createdAt": "2026-04-05T20:00:00.000Z",
+      "updatedAt": "2026-04-05T20:00:00.000Z"
+    },
+    {
+      "id": "food_2",
+      "name": "Blueberries",
+      "unitQuantity": 100,
+      "unitType": "g",
+      "caloriesPerUnit": 57,
+      "proteinPerUnit": 0.7,
+      "fiberPerUnit": 2.4,
+      "createdAt": "2026-04-05T20:00:00.000Z",
+      "updatedAt": "2026-04-05T20:00:00.000Z"
+    },
+    {
+      "id": "food_3",
+      "name": "Chicken Breast",
+      "unitQuantity": 112,
+      "unitType": "g",
+      "caloriesPerUnit": 187,
+      "proteinPerUnit": 35,
+      "fiberPerUnit": 0,
+      "createdAt": "2026-04-05T20:00:00.000Z",
+      "updatedAt": "2026-04-05T20:00:00.000Z"
+    },
+    {
+      "id": "food_4",
+      "name": "Brown Rice",
+      "unitQuantity": 195,
+      "unitType": "g",
+      "caloriesPerUnit": 216,
+      "proteinPerUnit": 5,
+      "fiberPerUnit": 3.5,
+      "createdAt": "2026-04-05T20:00:00.000Z",
+      "updatedAt": "2026-04-05T20:00:00.000Z"
+    }
+  ],
+  "templates": [],
+  "templateItems": [],
+  "logEntries": []
+}
