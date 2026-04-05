@@ -1,0 +1,41 @@
+import { calculateNutrition, roundNutritionValue, sumNutrition, type NutritionTotals } from "@shared/nutrition";
+import type { Food, LogEntry, Meal } from "@shared/types";
+
+export interface EnrichedLogEntry extends LogEntry {
+  food: Food | null;
+  nutrition: NutritionTotals;
+}
+
+export function enrichLogEntries(entries: LogEntry[], foods: Food[]): EnrichedLogEntry[] {
+  const foodsById = new Map(foods.map((food) => [food.id, food]));
+
+  return entries.map((entry) => {
+    const food = foodsById.get(entry.foodId) ?? null;
+    const nutrition = food
+      ? calculateNutrition(food, entry.actualAmount)
+      : { calories: 0, protein: 0, fiber: 0 };
+
+    return {
+      ...entry,
+      food,
+      nutrition: {
+        calories: roundNutritionValue(nutrition.calories),
+        protein: roundNutritionValue(nutrition.protein),
+        fiber: roundNutritionValue(nutrition.fiber),
+      },
+    };
+  });
+}
+
+export function getMealTotals(entries: EnrichedLogEntry[]): NutritionTotals {
+  return sumNutrition(entries.map((entry) => entry.nutrition));
+}
+
+export function groupEntriesByMeal(entries: EnrichedLogEntry[]): Record<Meal, EnrichedLogEntry[]> {
+  return {
+    Breakfast: entries.filter((entry) => entry.meal === "Breakfast"),
+    Lunch: entries.filter((entry) => entry.meal === "Lunch"),
+    Dinner: entries.filter((entry) => entry.meal === "Dinner"),
+    Snack: entries.filter((entry) => entry.meal === "Snack"),
+  };
+}

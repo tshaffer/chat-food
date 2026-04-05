@@ -1,10 +1,11 @@
 import cors from "cors";
 import express from "express";
-import { calculateNutrition, roundNutritionValue } from "../shared/nutrition.js";
+import { roundNutritionValue } from "../shared/nutrition.js";
 import type {
   Food,
   FoodInput,
   LogEntry,
+  LogEntryInput,
   Meal,
   Template,
   User,
@@ -26,8 +27,16 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isPositiveNumber(value: unknown): value is number {
+  return isFiniteNumber(value) && value > 0;
+}
+
 function badRequest(message: string) {
   return { error: message };
+}
+
+function isIsoDateString(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function validateUserInput(input: unknown): input is UserInput {
@@ -79,6 +88,25 @@ function serializeFood(food: Food) {
 
 function getMeals(): Meal[] {
   return ["Breakfast", "Lunch", "Dinner", "Snack"];
+}
+
+function isMeal(value: unknown): value is Meal {
+  return typeof value === "string" && getMeals().includes(value as Meal);
+}
+
+function validateLogEntryInput(input: unknown): input is LogEntryInput {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+
+  const candidate = input as LogEntryInput;
+
+  return (
+    isIsoDateString(candidate.date) &&
+    isMeal(candidate.meal) &&
+    isNonEmptyString(candidate.foodId) &&
+    isPositiveNumber(candidate.actualAmount)
+  );
 }
 
 app.get("/api/health", (_request, response) => {
@@ -268,9 +296,29 @@ app.delete("/api/templates/:id", async (request, response) => {
 
 app.get("/api/users/:userId/log-entries", async (request, response) => {
   const database = await readDatabase();
-  const { startDate, endDate } = request.query;
+  const { date, startDate, endDate } = request.query;
+  const user = database.users.find((item) => item.id === request.params.userId);
+
+  if (!user) {
+    response.status(404).json(badRequest("User not found."));
+    return;
+  }
+
+  if (
+    (typeof date === "string" && !isIsoDateString(date)) ||
+    (typeof startDate === "string" && !isIsoDateString(startDate)) ||
+    (typeof endDate === "string" && !isIsoDateString(endDate))
+  ) {
+    response.status(400).json(badRequest("Date filters must use YYYY-MM-DD format."));
+    return;
+  }
+
   const entries = database.logEntries.filter((entry) => {
     if (entry.userId !== request.params.userId) {
+      return false;
+    }
+
+    if (typeof date === "string" && entry.date !== date) {
       return false;
     }
 
@@ -285,42 +333,17 @@ app.get("/api/users/:userId/log-entries", async (request, response) => {
     return true;
   });
 
-  response.json(
-    entries.map((entry) => {
-      const food = database.foods.find((item) => item.id === entry.foodId);
-      const nutrition = food ? calculateNutrition(food, entry.actualAmount) : null;
-
-      return {
-        ...entry,
-        food,
-        nutrition: nutrition
-          ? {
-              calories: roundNutritionValue(nutrition.calories),
-              protein: roundNutritionValue(nutrition.protein),
-              fiber: roundNutritionValue(nutrition.fiber),
-            }
-          : null,
-      };
-    }),
-  );
+  response.json(entries);
 });
 
 app.post("/api/users/:userId/log-entries", async (request, response) => {
   const database = await readDatabase();
-  const meal = request.body?.meal;
-  const foodId = request.body?.foodId;
-  const actualAmount = request.body?.actualAmount;
-  const date = request.body?.date;
-
-  if (
-    !isNonEmptyString(date) ||
-    !getMeals().includes(meal) ||
-    !isNonEmptyString(foodId) ||
-    !isFiniteNumber(actualAmount)
-  ) {
+  if (!validateLogEntryInput(request.body)) {
     response.status(400).json(badRequest("Log entry input is invalid."));
     return;
   }
+
+  const { date, meal, foodId, actualAmount } = request.body;
 
   const user = database.users.find((item) => item.id === request.params.userId);
   const food = database.foods.find((item) => item.id === foodId);
@@ -358,20 +381,12 @@ app.put("/api/log-entries/:id", async (request, response) => {
     return;
   }
 
-  const meal = request.body?.meal;
-  const foodId = request.body?.foodId;
-  const actualAmount = request.body?.actualAmount;
-  const date = request.body?.date;
-
-  if (
-    !isNonEmptyString(date) ||
-    !getMeals().includes(meal) ||
-    !isNonEmptyString(foodId) ||
-    !isFiniteNumber(actualAmount)
-  ) {
+  if (!validateLogEntryInput(request.body)) {
     response.status(400).json(badRequest("Log entry input is invalid."));
     return;
   }
+
+  const { date, meal, foodId, actualAmount } = request.body;
 
   const food = database.foods.find((item) => item.id === foodId);
   if (!food) {

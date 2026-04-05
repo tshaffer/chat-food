@@ -1,4 +1,4 @@
-import type { Food, FoodInput, User } from "@shared/types";
+import type { Food, FoodInput, LogEntry, LogEntryInput, User } from "@shared/types";
 
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
@@ -41,6 +41,46 @@ export const api = {
     }),
   deleteFood: (id: string) =>
     request<void>(`/api/foods/${id}`, {
+      method: "DELETE",
+    }),
+  getLogEntries: (
+    userId: string,
+    filters?: {
+      date?: string;
+      startDate?: string;
+      endDate?: string;
+    },
+  ) => {
+    const searchParams = new URLSearchParams();
+
+    if (filters?.date) {
+      searchParams.set("date", filters.date);
+    }
+
+    if (filters?.startDate) {
+      searchParams.set("startDate", filters.startDate);
+    }
+
+    if (filters?.endDate) {
+      searchParams.set("endDate", filters.endDate);
+    }
+
+    const query = searchParams.toString();
+
+    return request<LogEntry[]>(`/api/users/${userId}/log-entries${query ? `?${query}` : ""}`);
+  },
+  createLogEntry: (userId: string, input: LogEntryInput) =>
+    request<LogEntry>(`/api/users/${userId}/log-entries`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  updateLogEntry: (id: string, input: LogEntryInput) =>
+    request<LogEntry>(`/api/log-entries/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+  deleteLogEntry: (id: string) =>
+    request<void>(`/api/log-entries/${id}`, {
       method: "DELETE",
     }),
 };

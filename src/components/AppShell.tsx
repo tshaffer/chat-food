@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { User } from "@shared/types";
 
 const navigationItems = [
-  { to: "/", label: "Today" },
+  { to: "/today", label: "Today" },
   { to: "/log", label: "Log" },
   { to: "/templates", label: "Templates" },
   { to: "/foods", label: "Foods" },
@@ -39,7 +39,7 @@ export function AppShell({
               key={item.to}
               className={({ isActive }) => (isActive ? "nav-link nav-link--active" : "nav-link")}
               to={item.to}
-              end={item.to === "/"}
+              end={item.to === "/today"}
             >
               {item.label}
             </NavLink>
@@ -68,7 +68,7 @@ export function AppShell({
               </select>
             </label>
 
-            <Link className="button button--primary" to="/foods?createFood=1">
+            <Link className="button button--primary" to="/today?addEntry=1">
               Quick Add
             </Link>
           </div>

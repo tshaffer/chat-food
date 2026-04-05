@@ -1,4 +1,4 @@
-import type { Food } from "./types";
+import type { Food } from "./types.js";
 
 export interface NutritionTotals {
   calories: number;

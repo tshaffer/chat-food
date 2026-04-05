@@ -67,4 +67,11 @@ export interface UserInput {
   name: string;
 }
 
+export interface LogEntryInput {
+  date: string;
+  meal: Meal;
+  foodId: string;
+  actualAmount: number;
+}
+
 export const meals: Meal[] = ["Breakfast", "Lunch", "Dinner", "Snack"];

@@ -180,6 +180,11 @@ button {
   margin: 0;
 }
 
+.page-subtitle {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+}
+
 .page-header__actions {
   display: flex;
   gap: 12px;
@@ -235,6 +240,11 @@ button {
   color: white;
 }
 
+.button--danger-soft {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 .button--ghost,
 .button--ghost-danger {
   background: transparent;
@@ -266,6 +276,72 @@ button {
   color: var(--text-muted);
   font-weight: 600;
   font-size: 0.88rem;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.summary-card {
+  display: grid;
+  gap: 6px;
+  padding: 20px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 242, 235, 0.9));
+  box-shadow: var(--shadow);
+}
+
+.summary-card strong {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.summary-card__unit {
+  color: var(--text-muted);
+  min-height: 1.2em;
+}
+
+.date-control {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.date-control input {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface-strong);
+}
+
+.meal-section {
+  padding: 18px;
+}
+
+.meal-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.meal-section__header h2 {
+  margin: 0;
+}
+
+.meal-section__totals {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+
+.meal-section__empty {
+  box-shadow: none;
+  border-style: dashed;
 }
 
 .table-actions {
@@ -341,6 +417,39 @@ button {
   gap: 6px;
 }
 
+.nutrition-preview {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface-muted);
+}
+
+.nutrition-preview__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nutrition-preview__grid div {
+  display: grid;
+  gap: 4px;
+}
+
+.nutrition-preview__grid strong {
+  font-size: 1.3rem;
+}
+
+.nutrition-preview__grid span,
+.nutrition-preview__meta {
+  color: var(--text-muted);
+}
+
+.nutrition-preview__meta {
+  margin: 0;
+}
+
 .form-error {
   grid-column: 1 / -1;
   padding: 12px;
@@ -373,6 +482,11 @@ button {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid,
+  .nutrition-preview__grid {
     grid-template-columns: 1fr;
   }
 

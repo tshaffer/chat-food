@@ -51,5 +51,54 @@
   ],
   "templates": [],
   "templateItems": [],
-  "logEntries": []
+  "logEntries": [
+    {
+      "id": "entry_1",
+      "userId": "user_1",
+      "date": "2026-04-05",
+      "meal": "Breakfast",
+      "templateId": null,
+      "templateNameSnapshot": null,
+      "foodId": "food_1",
+      "actualAmount": 170,
+      "createdAt": "2026-04-05T20:10:00.000Z",
+      "updatedAt": "2026-04-05T20:10:00.000Z"
+    },
+    {
+      "id": "entry_2",
+      "userId": "user_1",
+      "date": "2026-04-05",
+      "meal": "Breakfast",
+      "templateId": null,
+      "templateNameSnapshot": null,
+      "foodId": "food_2",
+      "actualAmount": 120,
+      "createdAt": "2026-04-05T20:12:00.000Z",
+      "updatedAt": "2026-04-05T20:12:00.000Z"
+    },
+    {
+      "id": "entry_3",
+      "userId": "user_1",
+      "date": "2026-04-05",
+      "meal": "Lunch",
+      "templateId": null,
+      "templateNameSnapshot": null,
+      "foodId": "food_3",
+      "actualAmount": 168,
+      "createdAt": "2026-04-05T20:20:00.000Z",
+      "updatedAt": "2026-04-05T20:20:00.000Z"
+    },
+    {
+      "id": "entry_4",
+      "userId": "user_1",
+      "date": "2026-04-05",
+      "meal": "Lunch",
+      "templateId": null,
+      "templateNameSnapshot": null,
+      "foodId": "food_4",
+      "actualAmount": 195,
+      "createdAt": "2026-04-05T20:21:00.000Z",
+      "updatedAt": "2026-04-05T20:21:00.000Z"
+    }
+  ]
 }

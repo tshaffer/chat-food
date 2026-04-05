@@ -3,6 +3,7 @@ import { AppShell } from "./components/AppShell";
 import { useCurrentUser } from "./hooks/useCurrentUser";
 import { FoodsPage } from "./pages/FoodsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { TodayPage } from "./pages/TodayPage";
 
 export default function App() {
   const { users, currentUser, currentUserId, setCurrentUserId, isLoading, error } = useCurrentUser();
@@ -23,15 +24,8 @@ export default function App() {
       onChangeUser={setCurrentUserId}
     >
       <Routes>
-        <Route
-          path="/"
-          element={
-            <PlaceholderPage
-              title="Today"
-              description="Daily summary, meal sections, and food logging are next in Phase 2."
-            />
-          }
-        />
+        <Route path="/" element={<Navigate to="/today" replace />} />
+        <Route path="/today" element={<TodayPage currentUser={currentUser} />} />
         <Route
           path="/log"
           element={
