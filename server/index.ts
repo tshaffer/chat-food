@@ -22,7 +22,7 @@ import type {
   User,
   UserInput,
 } from "../shared/types.js";
-import { createId, readDatabase, writeDatabase } from "./store.js";
+import { connectDatabase, createId, readDatabase, writeDatabase } from "./store.js";
 
 const port = Number(process.env.PORT ?? 3001);
 
@@ -697,7 +697,14 @@ export function createApp() {
 const app = createApp();
 
 if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => {
-    console.log(`Food Tracker API listening on http://localhost:${port}`);
-  });
+  void connectDatabase()
+    .then(() => {
+      app.listen(port, () => {
+        console.log(`Food Tracker API listening on http://localhost:${port}`);
+      });
+    })
+    .catch((error) => {
+      console.error("Failed to connect to MongoDB", error);
+      process.exitCode = 1;
+    });
 }

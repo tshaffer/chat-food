@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { Readable, Writable } from "node:stream";
+import { MongoMemoryServer } from "mongodb-memory-server";
 import { createApp } from "../server/index.js";
+import { disconnectDatabase, readDatabase, writeDatabase } from "../server/store.js";
 import type { Database } from "../shared/types.js";
 
 interface TestRequestInput {
@@ -20,14 +20,39 @@ interface TestResponse {
 }
 
 export async function createTempDatabase(database: Database) {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "food-tracker-tests-"));
-  const dbPath = path.join(tempDir, "db.json");
-  await writeFile(dbPath, `${JSON.stringify(database, null, 2)}\n`, "utf-8");
-  return { tempDir, dbPath };
+  const mongoServer = await MongoMemoryServer.create();
+  const dbName = `food-tracker-test-${randomUUID()}`;
+
+  const previousUri = process.env.MONGODB_URI;
+  const previousDbName = process.env.MONGODB_DB_NAME;
+  process.env.MONGODB_URI = mongoServer.getUri();
+  process.env.MONGODB_DB_NAME = dbName;
+
+  await writeDatabase(database);
+
+  return {
+    mongoServer,
+    cleanup: async () => {
+      await disconnectDatabase();
+      await mongoServer.stop();
+
+      if (previousUri) {
+        process.env.MONGODB_URI = previousUri;
+      } else {
+        delete process.env.MONGODB_URI;
+      }
+
+      if (previousDbName) {
+        process.env.MONGODB_DB_NAME = previousDbName;
+      } else {
+        delete process.env.MONGODB_DB_NAME;
+      }
+    },
+  };
 }
 
-export async function readTempDatabase(dbPath: string): Promise<Database> {
-  return JSON.parse(await readFile(dbPath, "utf-8")) as Database;
+export async function readTempDatabase(): Promise<Database> {
+  return readDatabase();
 }
 
 async function performRequest(app: ReturnType<typeof createApp>, input: TestRequestInput): Promise<TestResponse> {
@@ -112,25 +137,8 @@ async function performRequest(app: ReturnType<typeof createApp>, input: TestRequ
 }
 
 export async function withTestServer<T>(
-  dbPath: string,
   run: (request: (input: TestRequestInput) => Promise<TestResponse>) => Promise<T>,
 ) {
-  const previousDbPath = process.env.FOOD_TRACKER_DB_PATH;
-  process.env.FOOD_TRACKER_DB_PATH = dbPath;
-
   const app = createApp();
-
-  try {
-    return await run((input) => performRequest(app, input));
-  } finally {
-    if (previousDbPath) {
-      process.env.FOOD_TRACKER_DB_PATH = previousDbPath;
-    } else {
-      delete process.env.FOOD_TRACKER_DB_PATH;
-    }
-  }
-}
-
-export async function cleanupTempDatabase(tempDir: string) {
-  await rm(tempDir, { recursive: true, force: true });
+  return run((input) => performRequest(app, input));
 }

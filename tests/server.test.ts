@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Database } from "../shared/types.js";
-import { cleanupTempDatabase, createTempDatabase, readTempDatabase, withTestServer } from "./helpers.js";
+import { createTempDatabase, readTempDatabase, withTestServer } from "./helpers.js";
 
 function makeDatabase(): Database {
   return {
@@ -77,10 +77,10 @@ function makeDatabase(): Database {
 }
 
 test("POST /api/users/:userId/log-entries/from-template creates snapshotted entries", async () => {
-  const { tempDir, dbPath } = await createTempDatabase(makeDatabase());
+  const { cleanup } = await createTempDatabase(makeDatabase());
 
   try {
-    await withTestServer(dbPath, async (request) => {
+    await withTestServer(async (request) => {
       const response = await request({
         method: "POST",
         url: "/api/users/user_1/log-entries/from-template",
@@ -99,20 +99,20 @@ test("POST /api/users/:userId/log-entries/from-template creates snapshotted entr
       assert.deepEqual(body[1].nutritionSnapshot, { calories: 85.5, protein: 1.1, fiber: 3.6 });
     });
 
-    const database = await readTempDatabase(dbPath);
+    const database = await readTempDatabase();
     const created = database.logEntries.filter((entry) => entry.date === "2026-04-06");
     assert.equal(created.length, 2);
     assert.equal(created[0].templateNameSnapshot, "Breakfast Bowl");
   } finally {
-    await cleanupTempDatabase(tempDir);
+    await cleanup();
   }
 });
 
 test("DELETE /api/foods/:id blocks deletion when the food is still referenced", async () => {
-  const { tempDir, dbPath } = await createTempDatabase(makeDatabase());
+  const { cleanup } = await createTempDatabase(makeDatabase());
 
   try {
-    await withTestServer(dbPath, async (request) => {
+    await withTestServer(async (request) => {
       const response = await request({
         method: "DELETE",
         url: "/api/foods/food_1",
@@ -124,15 +124,15 @@ test("DELETE /api/foods/:id blocks deletion when the food is still referenced", 
       assert.match(body.error.message, /log entry/);
     });
   } finally {
-    await cleanupTempDatabase(tempDir);
+    await cleanup();
   }
 });
 
 test("template save and update return normalized ordered items", async () => {
-  const { tempDir, dbPath } = await createTempDatabase(makeDatabase());
+  const { cleanup } = await createTempDatabase(makeDatabase());
 
   try {
-    await withTestServer(dbPath, async (request) => {
+    await withTestServer(async (request) => {
       const createResponse = await request({
         method: "POST",
         url: "/api/users/user_1/templates",
@@ -170,13 +170,13 @@ test("template save and update return normalized ordered items", async () => {
       assert.equal(updated.items[0].defaultAmount, 100);
     });
 
-    const database = await readTempDatabase(dbPath);
+    const database = await readTempDatabase();
     const savedTemplate = database.templates.find((template) => template.name === "Evening Snack Updated");
     assert.ok(savedTemplate);
     const savedItems = database.templateItems.filter((item) => item.templateId === savedTemplate.id);
     assert.equal(savedItems.length, 1);
     assert.equal(savedItems[0].lineNumber, 1);
   } finally {
-    await cleanupTempDatabase(tempDir);
+    await cleanup();
   }
 });
