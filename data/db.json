@@ -49,8 +49,52 @@
       "updatedAt": "2026-04-05T20:00:00.000Z"
     }
   ],
-  "templates": [],
-  "templateItems": [],
+  "templates": [
+    {
+      "id": "template_1",
+      "userId": "user_1",
+      "name": "Yogurt Bowl",
+      "createdAt": "2026-04-05T19:40:00.000Z",
+      "updatedAt": "2026-04-05T19:40:00.000Z"
+    },
+    {
+      "id": "template_2",
+      "userId": "user_1",
+      "name": "Chicken Rice Lunch",
+      "createdAt": "2026-04-05T19:45:00.000Z",
+      "updatedAt": "2026-04-05T19:45:00.000Z"
+    }
+  ],
+  "templateItems": [
+    {
+      "id": "template_item_1",
+      "templateId": "template_1",
+      "lineNumber": 1,
+      "foodId": "food_1",
+      "defaultAmount": 170
+    },
+    {
+      "id": "template_item_2",
+      "templateId": "template_1",
+      "lineNumber": 2,
+      "foodId": "food_2",
+      "defaultAmount": 100
+    },
+    {
+      "id": "template_item_3",
+      "templateId": "template_2",
+      "lineNumber": 1,
+      "foodId": "food_3",
+      "defaultAmount": 168
+    },
+    {
+      "id": "template_item_4",
+      "templateId": "template_2",
+      "lineNumber": 2,
+      "foodId": "food_4",
+      "defaultAmount": 195
+    }
+  ],
   "logEntries": [
     {
       "id": "entry_1",

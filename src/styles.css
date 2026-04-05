@@ -192,6 +192,18 @@ button {
   flex-wrap: wrap;
 }
 
+.filters-bar {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+  padding: 16px;
+}
+
+.filters-bar__search {
+  flex: 1 1 220px;
+}
+
 .card,
 .empty-state {
   background: var(--surface);
@@ -344,6 +356,84 @@ button {
   border-style: dashed;
 }
 
+.templates-layout,
+.history-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.templates-sidebar,
+.template-editor,
+.history-sidebar,
+.history-detail {
+  padding: 18px;
+}
+
+.templates-sidebar__header,
+.template-editor__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  flex-wrap: wrap;
+}
+
+.template-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.template-list__item,
+.history-day {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-strong);
+  text-align: left;
+}
+
+.template-list__item span,
+.history-day span {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.template-list__item--active,
+.history-day--active {
+  border-color: rgba(15, 118, 110, 0.4);
+  background: var(--accent-soft);
+}
+
+.template-name-field {
+  display: grid;
+  gap: 6px;
+  min-width: min(100%, 360px);
+}
+
+.template-name-field input {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface-strong);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #0c5f58;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .table-actions {
   display: flex;
   gap: 8px;
@@ -473,6 +563,11 @@ button {
     overflow-x: auto;
     padding-bottom: 10px;
   }
+
+  .templates-layout,
+  .history-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -492,5 +587,11 @@ button {
 
   .table-actions {
     justify-content: flex-start;
+  }
+
+  .filters-bar,
+  .templates-sidebar__header,
+  .template-editor__header {
+    align-items: stretch;
   }
 }

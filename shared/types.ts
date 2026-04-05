@@ -33,6 +33,10 @@ export interface TemplateItem {
   defaultAmount: number;
 }
 
+export interface TemplateWithItems extends Template {
+  items: TemplateItem[];
+}
+
 export interface LogEntry {
   id: string;
   userId: string;
@@ -72,6 +76,24 @@ export interface LogEntryInput {
   meal: Meal;
   foodId: string;
   actualAmount: number;
+}
+
+export interface TemplateItemInput {
+  lineNumber: number;
+  foodId: string;
+  defaultAmount: number;
+}
+
+export interface TemplateInput {
+  name: string;
+  items: TemplateItemInput[];
+}
+
+export interface AddFromTemplateInput {
+  date: string;
+  meal: Meal;
+  templateId: string;
+  multiplier: number;
 }
 
 export const meals: Meal[] = ["Breakfast", "Lunch", "Dinner", "Snack"];

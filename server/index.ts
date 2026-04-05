@@ -2,12 +2,17 @@ import cors from "cors";
 import express from "express";
 import { roundNutritionValue } from "../shared/nutrition.js";
 import type {
+  AddFromTemplateInput,
   Food,
   FoodInput,
   LogEntry,
   LogEntryInput,
   Meal,
   Template,
+  TemplateInput,
+  TemplateItem,
+  TemplateItemInput,
+  TemplateWithItems,
   User,
   UserInput,
 } from "../shared/types.js";
@@ -107,6 +112,83 @@ function validateLogEntryInput(input: unknown): input is LogEntryInput {
     isNonEmptyString(candidate.foodId) &&
     isPositiveNumber(candidate.actualAmount)
   );
+}
+
+function validateTemplateItemInput(input: unknown): input is TemplateItemInput {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+
+  const candidate = input as TemplateItemInput;
+
+  return (
+    isFiniteNumber(candidate.lineNumber) &&
+    Number.isInteger(candidate.lineNumber) &&
+    candidate.lineNumber > 0 &&
+    isNonEmptyString(candidate.foodId) &&
+    isPositiveNumber(candidate.defaultAmount)
+  );
+}
+
+function validateTemplateInput(input: unknown): input is TemplateInput {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+
+  const candidate = input as TemplateInput;
+
+  return (
+    isNonEmptyString(candidate.name) &&
+    Array.isArray(candidate.items) &&
+    candidate.items.length > 0 &&
+    candidate.items.every(validateTemplateItemInput)
+  );
+}
+
+function validateAddFromTemplateInput(input: unknown): input is AddFromTemplateInput {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+
+  const candidate = input as AddFromTemplateInput;
+
+  return (
+    isIsoDateString(candidate.date) &&
+    isMeal(candidate.meal) &&
+    isNonEmptyString(candidate.templateId) &&
+    isPositiveNumber(candidate.multiplier)
+  );
+}
+
+function buildTemplateResponse(
+  template: Template,
+  templateItems: TemplateItem[],
+): TemplateWithItems {
+  return {
+    ...template,
+    items: templateItems
+      .filter((item) => item.templateId === template.id)
+      .sort((left, right) => left.lineNumber - right.lineNumber),
+  };
+}
+
+function normalizeTemplateItems(
+  templateId: string,
+  items: TemplateItemInput[],
+): TemplateItem[] {
+  return [...items]
+    .sort((left, right) => left.lineNumber - right.lineNumber)
+    .map((item, index) => ({
+      id: createId("template_item"),
+      templateId,
+      lineNumber: index + 1,
+      foodId: item.foodId,
+      defaultAmount: item.defaultAmount,
+    }));
+}
+
+function validateTemplateFoods(items: TemplateItemInput[], foods: Food[]): boolean {
+  return items.every((item) => foods.some((food) => food.id === item.foodId));
 }
 
 app.get("/api/health", (_request, response) => {
@@ -212,14 +294,16 @@ app.delete("/api/foods/:id", async (request, response) => {
 
 app.get("/api/users/:userId/templates", async (request, response) => {
   const database = await readDatabase();
+  const user = database.users.find((item) => item.id === request.params.userId);
+
+  if (!user) {
+    response.status(404).json(badRequest("User not found."));
+    return;
+  }
+
   const templates = database.templates
     .filter((template) => template.userId === request.params.userId)
-    .map((template) => ({
-      ...template,
-      items: database.templateItems
-        .filter((item) => item.templateId === template.id)
-        .sort((left, right) => left.lineNumber - right.lineNumber),
-    }));
+    .map((template) => buildTemplateResponse(template, database.templateItems));
 
   response.json(templates);
 });
@@ -233,9 +317,13 @@ app.post("/api/users/:userId/templates", async (request, response) => {
     return;
   }
 
-  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
-  if (!name) {
-    response.status(400).json(badRequest("Template name is required."));
+  if (!validateTemplateInput(request.body)) {
+    response.status(400).json(badRequest("Template input is invalid."));
+    return;
+  }
+
+  if (!validateTemplateFoods(request.body.items, database.foods)) {
+    response.status(400).json(badRequest("Template contains an invalid food."));
     return;
   }
 
@@ -243,14 +331,16 @@ app.post("/api/users/:userId/templates", async (request, response) => {
   const template: Template = {
     id: createId("template"),
     userId: user.id,
-    name,
+    name: request.body.name.trim(),
     createdAt: now,
     updatedAt: now,
   };
+  const items = normalizeTemplateItems(template.id, request.body.items);
 
   database.templates.push(template);
+  database.templateItems.push(...items);
   await writeDatabase(database);
-  response.status(201).json({ ...template, items: [] });
+  response.status(201).json(buildTemplateResponse(template, items));
 });
 
 app.put("/api/templates/:id", async (request, response) => {
@@ -262,21 +352,24 @@ app.put("/api/templates/:id", async (request, response) => {
     return;
   }
 
-  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
-  if (!name) {
-    response.status(400).json(badRequest("Template name is required."));
+  if (!validateTemplateInput(request.body)) {
+    response.status(400).json(badRequest("Template input is invalid."));
     return;
   }
 
-  template.name = name;
+  if (!validateTemplateFoods(request.body.items, database.foods)) {
+    response.status(400).json(badRequest("Template contains an invalid food."));
+    return;
+  }
+
+  template.name = request.body.name.trim();
   template.updatedAt = new Date().toISOString();
+  const nextItems = normalizeTemplateItems(template.id, request.body.items);
+
+  database.templateItems = database.templateItems.filter((item) => item.templateId !== template.id);
+  database.templateItems.push(...nextItems);
   await writeDatabase(database);
-
-  const items = database.templateItems
-    .filter((item) => item.templateId === template.id)
-    .sort((left, right) => left.lineNumber - right.lineNumber);
-
-  response.json({ ...template, items });
+  response.json(buildTemplateResponse(template, nextItems));
 });
 
 app.delete("/api/templates/:id", async (request, response) => {
@@ -422,46 +515,48 @@ app.post("/api/users/:userId/log-entries/from-template", async (request, respons
   const database = await readDatabase();
   const user = database.users.find((item) => item.id === request.params.userId);
   const template = database.templates.find((item) => item.id === request.body?.templateId && item.userId === request.params.userId);
-  const date = request.body?.date;
-  const meal = request.body?.meal;
-  const multiplier = request.body?.multiplier;
 
   if (!user || !template) {
     response.status(404).json(badRequest("User or template not found."));
     return;
   }
 
-  if (!isNonEmptyString(date) || !getMeals().includes(meal) || !isFiniteNumber(multiplier)) {
+  if (!validateAddFromTemplateInput(request.body)) {
     response.status(400).json(badRequest("Template logging input is invalid."));
     return;
   }
 
+  const { date, meal, multiplier } = request.body;
   const items = database.templateItems
     .filter((item) => item.templateId === template.id)
     .sort((left, right) => left.lineNumber - right.lineNumber);
 
-  const now = new Date().toISOString();
-  const createdEntries = items.flatMap((item): LogEntry[] => {
-    const food = database.foods.find((candidate) => candidate.id === item.foodId);
-    if (!food) {
-      return [];
-    }
+  if (items.length === 0) {
+    response.status(400).json(badRequest("Template must have at least one item."));
+    return;
+  }
 
-    return [
-      {
-        id: createId("entry"),
-        userId: user.id,
-        date,
-        meal,
-        templateId: template.id,
-        templateNameSnapshot: template.name,
-        foodId: food.id,
-        actualAmount: item.defaultAmount * multiplier,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ];
-  });
+  const hasInvalidFood = items.some((item) => !database.foods.some((food) => food.id === item.foodId));
+  if (hasInvalidFood) {
+    response.status(400).json(badRequest("Template contains an invalid food."));
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const createdEntries = items.map(
+    (item): LogEntry => ({
+      id: createId("entry"),
+      userId: user.id,
+      date,
+      meal,
+      templateId: template.id,
+      templateNameSnapshot: template.name,
+      foodId: item.foodId,
+      actualAmount: item.defaultAmount * multiplier,
+      createdAt: now,
+      updatedAt: now,
+    }),
+  );
 
   database.logEntries.push(...createdEntries);
   await writeDatabase(database);

@@ -39,3 +39,27 @@ export function groupEntriesByMeal(entries: EnrichedLogEntry[]): Record<Meal, En
     Snack: entries.filter((entry) => entry.meal === "Snack"),
   };
 }
+
+export interface DailySummary {
+  date: string;
+  entries: EnrichedLogEntry[];
+  totals: NutritionTotals;
+}
+
+export function buildDailySummaries(entries: EnrichedLogEntry[]): DailySummary[] {
+  const grouped = new Map<string, EnrichedLogEntry[]>();
+
+  entries.forEach((entry) => {
+    const existing = grouped.get(entry.date) ?? [];
+    existing.push(entry);
+    grouped.set(entry.date, existing);
+  });
+
+  return [...grouped.entries()]
+    .map(([date, dayEntries]) => ({
+      date,
+      entries: dayEntries.sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+      totals: getMealTotals(dayEntries),
+    }))
+    .sort((left, right) => right.date.localeCompare(left.date));
+}

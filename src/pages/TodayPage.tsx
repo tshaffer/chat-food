@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { meals, type Food, type LogEntry, type LogEntryInput, type Meal, type User } from "@shared/types";
+import { meals, type AddFromTemplateInput, type Food, type LogEntry, type LogEntryInput, type Meal, type TemplateWithItems, type User } from "@shared/types";
+import { AddFromTemplateDialog } from "../components/AddFromTemplateDialog";
 import { api } from "../lib/api";
 import { formatDisplayDate, getTodayDateString } from "../lib/date";
 import {
@@ -23,6 +24,7 @@ export function TodayPage({ currentUser }: TodayPageProps) {
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [foods, setFoods] = useState<Food[]>([]);
   const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [templates, setTemplates] = useState<TemplateWithItems[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -31,6 +33,7 @@ export function TodayPage({ currentUser }: TodayPageProps) {
   const [editingEntry, setEditingEntry] = useState<EnrichedLogEntry | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EnrichedLogEntry | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isTemplateOpen, setIsTemplateOpen] = useState(false);
   const [createMeal, setCreateMeal] = useState<Meal>("Breakfast");
   const [createResetKey, setCreateResetKey] = useState("create-initial");
 
@@ -52,11 +55,16 @@ export function TodayPage({ currentUser }: TodayPageProps) {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadFoods() {
+    async function loadSharedData() {
       try {
-        const nextFoods = await api.getFoods();
+        const [nextFoods, nextTemplates] = await Promise.all([
+          api.getFoods(),
+          currentUser ? api.getTemplates(currentUser.id) : Promise.resolve<TemplateWithItems[]>([]),
+        ]);
+
         if (!cancelled) {
           setFoods(nextFoods);
+          setTemplates(nextTemplates);
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -65,12 +73,12 @@ export function TodayPage({ currentUser }: TodayPageProps) {
       }
     }
 
-    void loadFoods();
+    void loadSharedData();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentUser]);
 
   async function loadEntries(userId: string, date: string) {
     setIsLoading(true);
@@ -124,6 +132,11 @@ export function TodayPage({ currentUser }: TodayPageProps) {
     setIsCreateOpen(false);
     setFormError("");
     updateSearch({ addEntry: null, meal: null });
+  }
+
+  function closeTemplateDialog() {
+    setIsTemplateOpen(false);
+    setFormError("");
   }
 
   function openEditDialog(entry: EnrichedLogEntry) {
@@ -186,6 +199,25 @@ export function TodayPage({ currentUser }: TodayPageProps) {
     }
   }
 
+  async function handleAddFromTemplate(input: AddFromTemplateInput) {
+    if (!currentUser) {
+      return;
+    }
+
+    setIsSaving(true);
+    setFormError("");
+
+    try {
+      await api.addEntriesFromTemplate(currentUser.id, input);
+      await refreshEntries();
+      closeTemplateDialog();
+    } catch (saveError) {
+      setFormError(saveError instanceof Error ? saveError.message : "Unable to add entries from template.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function handleDeleteEntry() {
     if (!deleteTarget) {
       return;
@@ -235,7 +267,7 @@ export function TodayPage({ currentUser }: TodayPageProps) {
           <button className="button button--primary" type="button" onClick={() => openCreateDialog()}>
             Add Food
           </button>
-          <button className="button button--secondary" type="button" disabled title="Templates land in Phase 3">
+          <button className="button button--secondary" type="button" onClick={() => setIsTemplateOpen(true)}>
             Add from Template
           </button>
         </div>
@@ -317,6 +349,19 @@ export function TodayPage({ currentUser }: TodayPageProps) {
           }}
           onSubmit={handleUpdateEntry}
           onDelete={() => setDeleteTarget(editingEntry)}
+        />
+      ) : null}
+
+      {isTemplateOpen ? (
+        <AddFromTemplateDialog
+          currentUser={currentUser}
+          foods={foods}
+          templates={templates}
+          initialValues={{ date: selectedDate, meal: createMeal, templateId: templates[0]?.id ?? "", multiplier: 1 }}
+          isSaving={isSaving}
+          error={formError}
+          onCancel={closeTemplateDialog}
+          onSubmit={handleAddFromTemplate}
         />
       ) : null}
 

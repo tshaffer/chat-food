@@ -1,4 +1,13 @@
-import type { Food, FoodInput, LogEntry, LogEntryInput, User } from "@shared/types";
+import type {
+  AddFromTemplateInput,
+  Food,
+  FoodInput,
+  LogEntry,
+  LogEntryInput,
+  TemplateInput,
+  TemplateWithItems,
+  User,
+} from "@shared/types";
 
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
@@ -82,5 +91,25 @@ export const api = {
   deleteLogEntry: (id: string) =>
     request<void>(`/api/log-entries/${id}`, {
       method: "DELETE",
+    }),
+  getTemplates: (userId: string) => request<TemplateWithItems[]>(`/api/users/${userId}/templates`),
+  createTemplate: (userId: string, input: TemplateInput) =>
+    request<TemplateWithItems>(`/api/users/${userId}/templates`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  updateTemplate: (id: string, input: TemplateInput) =>
+    request<TemplateWithItems>(`/api/templates/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+  deleteTemplate: (id: string) =>
+    request<void>(`/api/templates/${id}`, {
+      method: "DELETE",
+    }),
+  addEntriesFromTemplate: (userId: string, input: AddFromTemplateInput) =>
+    request<LogEntry[]>(`/api/users/${userId}/log-entries/from-template`, {
+      method: "POST",
+      body: JSON.stringify(input),
     }),
 };

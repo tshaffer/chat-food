@@ -2,7 +2,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { useCurrentUser } from "./hooks/useCurrentUser";
 import { FoodsPage } from "./pages/FoodsPage";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { HistoryPage } from "./pages/HistoryPage";
+import { LogPage } from "./pages/LogPage";
+import { TemplatesPage } from "./pages/TemplatesPage";
 import { TodayPage } from "./pages/TodayPage";
 
 export default function App() {
@@ -26,34 +28,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/today" replace />} />
         <Route path="/today" element={<TodayPage currentUser={currentUser} />} />
-        <Route
-          path="/log"
-          element={
-            <PlaceholderPage
-              title="Log"
-              description="A filterable per-user log table will land in Phase 3."
-            />
-          }
-        />
-        <Route
-          path="/templates"
-          element={
-            <PlaceholderPage
-              title="Templates"
-              description="Template management and logging from templates will land in Phase 3."
-            />
-          }
-        />
+        <Route path="/log" element={<LogPage currentUser={currentUser} />} />
+        <Route path="/templates" element={<TemplatesPage currentUser={currentUser} />} />
         <Route path="/foods" element={<FoodsPage />} />
-        <Route
-          path="/history"
-          element={
-            <PlaceholderPage
-              title="History"
-              description="Daily totals and day-by-day detail views will land in Phase 3."
-            />
-          }
-        />
+        <Route path="/history" element={<HistoryPage currentUser={currentUser} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>
