@@ -13,8 +13,15 @@ let connectionPromise: Promise<typeof mongoose> | null = null;
 let connectedKey = "";
 
 function getMongoConfig() {
-  const uri = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017";
+  const uri = process.env.MONGODB_URI;
   const dbName = process.env.MONGODB_DB_NAME ?? "food-tracker";
+
+  if (!uri) {
+    throw new Error(
+      "MONGODB_URI is required. Configure it with your MongoDB Atlas connection string before starting the server or running seed/import commands.",
+    );
+  }
+
   return { uri, dbName };
 }
 
