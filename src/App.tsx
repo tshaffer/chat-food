@@ -8,7 +8,7 @@ import { TemplatesPage } from "./pages/TemplatesPage";
 import { TodayPage } from "./pages/TodayPage";
 
 export default function App() {
-  const { users, currentUser, currentUserId, setCurrentUserId, isLoading, error } = useCurrentUser();
+  const { users, currentUser, currentUserId, setCurrentUserId, createUser, isLoading, error } = useCurrentUser();
 
   if (isLoading) {
     return <div className="app-loading">Loading Food Tracker...</div>;
@@ -24,6 +24,7 @@ export default function App() {
       currentUser={currentUser}
       currentUserId={currentUserId}
       onChangeUser={setCurrentUserId}
+      onAddUser={createUser}
     >
       <Routes>
         <Route path="/" element={<Navigate to="/today" replace />} />

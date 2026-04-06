@@ -54,11 +54,20 @@ export function useCurrentUser() {
 
   const currentUser = users.find((user) => user.id === currentUserId) ?? null;
 
+  async function createUser(name: string) {
+    const createdUser = await api.createUser({ name });
+    const nextUsers = [...users, createdUser].sort((left, right) => left.name.localeCompare(right.name));
+    setUsers(nextUsers);
+    setCurrentUserId(createdUser.id);
+    return createdUser;
+  }
+
   return {
     users,
     currentUser,
     currentUserId,
     setCurrentUserId,
+    createUser,
     isLoading,
     error,
   };

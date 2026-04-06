@@ -7,6 +7,8 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
+    "db:clear": "tsx server/clear-database.ts",
+    "seed:foods-csv": "tsx server/import-foods-csv.ts",
     "seed:import-json": "tsx server/import-json.ts",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",

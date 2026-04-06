@@ -1,6 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { User } from "@shared/types";
+import { AddUserDialog } from "./AddUserDialog";
 
 const navigationItems = [
   { to: "/today", label: "Today" },
@@ -16,6 +17,7 @@ interface AppShellProps {
   users: User[];
   currentUserId: string;
   onChangeUser: (userId: string) => void;
+  onAddUser: (name: string) => Promise<unknown>;
 }
 
 export function AppShell({
@@ -24,7 +26,10 @@ export function AppShell({
   users,
   currentUserId,
   onChangeUser,
+  onAddUser,
 }: AppShellProps) {
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -68,6 +73,10 @@ export function AppShell({
               </select>
             </label>
 
+            <button className="button button--secondary" type="button" onClick={() => setIsAddUserOpen(true)}>
+              Add User
+            </button>
+
             <Link className="button button--primary" to="/today?addEntry=1">
               Quick Add
             </Link>
@@ -76,6 +85,16 @@ export function AppShell({
 
         <main className="page-content">{children}</main>
       </div>
+
+      {isAddUserOpen ? (
+        <AddUserDialog
+          onClose={() => setIsAddUserOpen(false)}
+          onSubmit={async (name) => {
+            await onAddUser(name);
+            setIsAddUserOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
