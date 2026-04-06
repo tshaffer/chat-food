@@ -182,6 +182,14 @@ The frontend runs on `http://localhost:5173` and talks to the backend API runnin
 
 You can also use any browser, not only Chrome, but `http://localhost:5173/` is the right address.
 
+If you want to start the app and keep the terminal free, you can run it in the background:
+
+```bash
+npm run dev > food-tracker.log 2>&1 &
+```
+
+That starts the frontend and backend in the background and writes output to `food-tracker.log`.
+
 ## Development Command
 
 ```bash
