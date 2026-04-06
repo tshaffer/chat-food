@@ -160,6 +160,30 @@ npm run seed:import-json
 
 ## Run in Development
 
+To launch the app locally:
+
+1. Open a terminal in the project folder.
+2. Run:
+
+```bash
+npm run dev
+```
+
+3. Open Chrome.
+4. Go to:
+
+```text
+http://localhost:5173/
+```
+
+This is the correct frontend URL for local development.
+
+The frontend runs on `http://localhost:5173` and talks to the backend API running on `http://localhost:3001`.
+
+You can also use any browser, not only Chrome, but `http://localhost:5173/` is the right address.
+
+## Development Command
+
 ```bash
 npm run dev
 ```
