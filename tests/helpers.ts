@@ -20,7 +20,12 @@ interface TestResponse {
 }
 
 export async function createTempDatabase(database: Database) {
-  const mongoServer = await MongoMemoryServer.create();
+  const mongoServer = await MongoMemoryServer.create({
+    instance: {
+      ip: "127.0.0.1",
+      port: 37017 + Math.floor(Math.random() * 1000),
+    },
+  });
   const dbName = `food-tracker-test-${randomUUID()}`;
 
   const previousUri = process.env.MONGODB_URI;

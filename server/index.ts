@@ -7,7 +7,6 @@ import {
 } from "../shared/nutrition.js";
 import type {
   AddFromTemplateInput,
-  Database,
   Food,
   FoodInput,
   LogEntry,
@@ -18,11 +17,35 @@ import type {
   TemplateInput,
   TemplateItem,
   TemplateItemInput,
-  TemplateWithItems,
   User,
   UserInput,
 } from "../shared/types.js";
-import { connectDatabase, createId, readDatabase, writeDatabase } from "./store.js";
+import {
+  connectDatabase,
+  countFoodReferences,
+  createId,
+  findFoodById,
+  findFoodByNameInsensitive,
+  findLogEntryById,
+  findTemplateById,
+  findUserById,
+  findUserByNameInsensitive,
+  insertFood,
+  insertLogEntries,
+  insertLogEntry,
+  insertTemplateWithItems,
+  insertUser,
+  listFoods,
+  listLogEntriesForUser,
+  listTemplatesForUser,
+  listUsers,
+  removeFood,
+  removeLogEntry,
+  removeTemplate,
+  updateFood,
+  updateLogEntry,
+  updateTemplateWithItems,
+} from "./store.js";
 
 const port = Number(process.env.PORT ?? 3001);
 
@@ -172,15 +195,6 @@ function validateAddFromTemplateInput(input: unknown): input is AddFromTemplateI
   );
 }
 
-function buildTemplateResponse(template: Template, templateItems: TemplateItem[]): TemplateWithItems {
-  return {
-    ...template,
-    items: templateItems
-      .filter((item) => item.templateId === template.id)
-      .sort((left, right) => left.lineNumber - right.lineNumber),
-  };
-}
-
 function normalizeTemplateItems(templateId: string, items: TemplateItemInput[]): TemplateItem[] {
   return [...items]
     .sort((left, right) => left.lineNumber - right.lineNumber)
@@ -199,34 +213,6 @@ function validateTemplateFoods(items: TemplateItemInput[], foods: Food[]): boole
 
 function snapshotNutrition(food: Food, actualAmount: number): NutritionSnapshot {
   return roundNutritionTotals(calculateNutrition(food, actualAmount));
-}
-
-function normalizeLogEntry(entry: LogEntry, foods: Food[]): LogEntry {
-  if (entry.nutritionSnapshot) {
-    return entry;
-  }
-
-  const food = foods.find((item) => item.id === entry.foodId);
-  return {
-    ...entry,
-    nutritionSnapshot: food
-      ? snapshotNutrition(food, entry.actualAmount)
-      : { calories: 0, protein: 0, fiber: 0 },
-  };
-}
-
-function normalizeDatabaseLogEntries(database: Database): boolean {
-  let changed = false;
-  database.logEntries = database.logEntries.map((entry) => {
-    if (entry.nutritionSnapshot) {
-      return entry;
-    }
-
-    changed = true;
-    return normalizeLogEntry(entry, database.foods);
-  });
-
-  return changed;
 }
 
 function createLogEntryRecord(
@@ -267,8 +253,7 @@ export function createApp() {
   });
 
   app.get("/api/users", async (_request, response) => {
-    const database = await readDatabase();
-    response.json(database.users);
+    response.json(await listUsers());
   });
 
   app.post("/api/users", async (request, response) => {
@@ -277,9 +262,8 @@ export function createApp() {
       return;
     }
 
-    const database = await readDatabase();
     const name = request.body.name.trim();
-    const existing = database.users.find((user) => user.name.toLowerCase() === name.toLowerCase());
+    const existing = await findUserByNameInsensitive(name);
 
     if (existing) {
       sendError(response, 409, "Username must be unique.");
@@ -287,14 +271,11 @@ export function createApp() {
     }
 
     const user: User = { id: createId("user"), name };
-    database.users.push(user);
-    await writeDatabase(database);
-    response.status(201).json(user);
+    response.status(201).json(await insertUser(user));
   });
 
   app.get("/api/foods", async (_request, response) => {
-    const database = await readDatabase();
-    response.json(database.foods.map(serializeFood));
+    response.json((await listFoods()).map(serializeFood));
   });
 
   app.post("/api/foods", async (request, response) => {
@@ -308,8 +289,7 @@ export function createApp() {
     }
 
     const input = sanitizeFoodInput(request.body);
-    const database = await readDatabase();
-    const duplicate = database.foods.find((food) => food.name.toLowerCase() === input.name.toLowerCase());
+    const duplicate = await findFoodByNameInsensitive(input.name);
 
     if (duplicate) {
       sendError(response, 409, "A food with that name already exists.");
@@ -324,9 +304,7 @@ export function createApp() {
       updatedAt: now,
     };
 
-    database.foods.push(food);
-    await writeDatabase(database);
-    response.status(201).json(serializeFood(food));
+    response.status(201).json(serializeFood(await insertFood(food)));
   });
 
   app.put("/api/foods/:id", async (request, response) => {
@@ -339,8 +317,7 @@ export function createApp() {
       return;
     }
 
-    const database = await readDatabase();
-    const food = database.foods.find((item) => item.id === request.params.id);
+    const food = await findFoodById(request.params.id);
 
     if (!food) {
       sendError(response, 404, "Food not found.");
@@ -348,32 +325,32 @@ export function createApp() {
     }
 
     const input = sanitizeFoodInput(request.body);
-    const duplicate = database.foods.find(
-      (item) => item.id !== food.id && item.name.toLowerCase() === input.name.toLowerCase(),
-    );
+    const duplicate = await findFoodByNameInsensitive(input.name, food.id);
 
     if (duplicate) {
       sendError(response, 409, "A food with that name already exists.");
       return;
     }
 
-    Object.assign(food, input, { updatedAt: new Date().toISOString() });
-
-    await writeDatabase(database);
-    response.json(serializeFood(food));
+    response.json(
+      serializeFood(
+        (await updateFood(food.id, {
+          ...input,
+          updatedAt: new Date().toISOString(),
+        }))!,
+      ),
+    );
   });
 
   app.delete("/api/foods/:id", async (request, response) => {
-    const database = await readDatabase();
-    const food = database.foods.find((item) => item.id === request.params.id);
+    const food = await findFoodById(request.params.id);
 
     if (!food) {
       sendError(response, 404, "Food not found.");
       return;
     }
 
-    const templateReferences = database.templateItems.filter((item) => item.foodId === request.params.id).length;
-    const logReferences = database.logEntries.filter((item) => item.foodId === request.params.id).length;
+    const { templateReferences, logReferences } = await countFoodReferences(request.params.id);
 
     if (templateReferences || logReferences) {
       const parts = [];
@@ -388,30 +365,23 @@ export function createApp() {
       return;
     }
 
-    database.foods = database.foods.filter((item) => item.id !== request.params.id);
-    await writeDatabase(database);
+    await removeFood(request.params.id);
     response.status(204).send();
   });
 
   app.get("/api/users/:userId/templates", async (request, response) => {
-    const database = await readDatabase();
-    const user = database.users.find((item) => item.id === request.params.userId);
+    const user = await findUserById(request.params.userId);
 
     if (!user) {
       sendError(response, 404, "User not found.");
       return;
     }
 
-    const templates = database.templates
-      .filter((template) => template.userId === request.params.userId)
-      .map((template) => buildTemplateResponse(template, database.templateItems));
-
-    response.json(templates);
+    response.json(await listTemplatesForUser(request.params.userId));
   });
 
   app.post("/api/users/:userId/templates", async (request, response) => {
-    const database = await readDatabase();
-    const user = database.users.find((item) => item.id === request.params.userId);
+    const user = await findUserById(request.params.userId);
 
     if (!user) {
       sendError(response, 404, "User not found.");
@@ -427,7 +397,8 @@ export function createApp() {
       return;
     }
 
-    if (!validateTemplateFoods(request.body.items, database.foods)) {
+    const foods = await listFoods();
+    if (!validateTemplateFoods(request.body.items, foods)) {
       sendError(response, 400, "Template contains a food that no longer exists.");
       return;
     }
@@ -442,17 +413,13 @@ export function createApp() {
     };
     const items = normalizeTemplateItems(template.id, request.body.items);
 
-    database.templates.push(template);
-    database.templateItems.push(...items);
-    await writeDatabase(database);
-    response.status(201).json(buildTemplateResponse(template, items));
+    response.status(201).json(await insertTemplateWithItems(template, items));
   });
 
   app.put("/api/templates/:id", async (request, response) => {
-    const database = await readDatabase();
-    const template = database.templates.find((item) => item.id === request.params.id);
+    const existingTemplate = await findTemplateById(request.params.id);
 
-    if (!template) {
+    if (!existingTemplate) {
       sendError(response, 404, "Template not found.");
       return;
     }
@@ -466,39 +433,36 @@ export function createApp() {
       return;
     }
 
-    if (!validateTemplateFoods(request.body.items, database.foods)) {
+    const foods = await listFoods();
+    if (!validateTemplateFoods(request.body.items, foods)) {
       sendError(response, 400, "Template contains a food that no longer exists.");
       return;
     }
 
-    template.name = request.body.name.trim();
-    template.updatedAt = new Date().toISOString();
-    const nextItems = normalizeTemplateItems(template.id, request.body.items);
+    const nextTemplate: Template = {
+      ...existingTemplate,
+      name: request.body.name.trim(),
+      updatedAt: new Date().toISOString(),
+    };
+    const nextItems = normalizeTemplateItems(nextTemplate.id, request.body.items);
 
-    database.templateItems = database.templateItems.filter((item) => item.templateId !== template.id);
-    database.templateItems.push(...nextItems);
-    await writeDatabase(database);
-    response.json(buildTemplateResponse(template, nextItems));
+    response.json((await updateTemplateWithItems(nextTemplate, nextItems))!);
   });
 
   app.delete("/api/templates/:id", async (request, response) => {
-    const database = await readDatabase();
-    const template = database.templates.find((item) => item.id === request.params.id);
+    const template = await findTemplateById(request.params.id);
 
     if (!template) {
       sendError(response, 404, "Template not found.");
       return;
     }
 
-    database.templates = database.templates.filter((item) => item.id !== request.params.id);
-    database.templateItems = database.templateItems.filter((item) => item.templateId !== request.params.id);
-    await writeDatabase(database);
+    await removeTemplate(request.params.id);
     response.status(204).send();
   });
 
   app.get("/api/users/:userId/log-entries", async (request, response) => {
-    const database = await readDatabase();
-    const user = database.users.find((item) => item.id === request.params.userId);
+    const user = await findUserById(request.params.userId);
     const { date, startDate, endDate } = request.query;
 
     if (!user) {
@@ -515,36 +479,16 @@ export function createApp() {
       return;
     }
 
-    const changed = normalizeDatabaseLogEntries(database);
-    if (changed) {
-      await writeDatabase(database);
-    }
-
-    const entries = database.logEntries.filter((entry) => {
-      if (entry.userId !== request.params.userId) {
-        return false;
-      }
-
-      if (typeof date === "string" && entry.date !== date) {
-        return false;
-      }
-
-      if (typeof startDate === "string" && entry.date < startDate) {
-        return false;
-      }
-
-      if (typeof endDate === "string" && entry.date > endDate) {
-        return false;
-      }
-
-      return true;
-    });
-
-    response.json(entries);
+    response.json(
+      await listLogEntriesForUser(request.params.userId, {
+        date: typeof date === "string" ? date : undefined,
+        startDate: typeof startDate === "string" ? startDate : undefined,
+        endDate: typeof endDate === "string" ? endDate : undefined,
+      }),
+    );
   });
 
   app.post("/api/users/:userId/log-entries", async (request, response) => {
-    const database = await readDatabase();
     if (!validateLogEntryInput(request.body)) {
       sendError(
         response,
@@ -555,8 +499,7 @@ export function createApp() {
     }
 
     const { date, meal, foodId, actualAmount } = request.body;
-    const user = database.users.find((item) => item.id === request.params.userId);
-    const food = database.foods.find((item) => item.id === foodId);
+    const [user, food] = await Promise.all([findUserById(request.params.userId), findFoodById(foodId)]);
 
     if (!user) {
       sendError(response, 404, "User not found.");
@@ -576,14 +519,11 @@ export function createApp() {
       templateNameSnapshot: null,
     });
 
-    database.logEntries.push(logEntry);
-    await writeDatabase(database);
-    response.status(201).json(logEntry);
+    response.status(201).json(await insertLogEntry(logEntry));
   });
 
   app.put("/api/log-entries/:id", async (request, response) => {
-    const database = await readDatabase();
-    const entry = database.logEntries.find((item) => item.id === request.params.id);
+    const entry = await findLogEntryById(request.params.id);
 
     if (!entry) {
       sendError(response, 404, "Log entry not found.");
@@ -600,41 +540,39 @@ export function createApp() {
     }
 
     const { date, meal, foodId, actualAmount } = request.body;
-    const food = database.foods.find((item) => item.id === foodId);
+    const food = await findFoodById(foodId);
 
     if (!food) {
       sendError(response, 404, "Food not found.");
       return;
     }
 
-    entry.date = date;
-    entry.meal = meal;
-    entry.foodId = foodId;
-    entry.actualAmount = actualAmount;
-    entry.nutritionSnapshot = snapshotNutrition(food, actualAmount);
-    entry.updatedAt = new Date().toISOString();
-
-    await writeDatabase(database);
-    response.json(entry);
+    response.json(
+      (await updateLogEntry(entry.id, {
+        date,
+        meal,
+        foodId,
+        actualAmount,
+        nutritionSnapshot: snapshotNutrition(food, actualAmount),
+        updatedAt: new Date().toISOString(),
+      }))!,
+    );
   });
 
   app.delete("/api/log-entries/:id", async (request, response) => {
-    const database = await readDatabase();
-    const entry = database.logEntries.find((item) => item.id === request.params.id);
+    const entry = await findLogEntryById(request.params.id);
 
     if (!entry) {
       sendError(response, 404, "Log entry not found.");
       return;
     }
 
-    database.logEntries = database.logEntries.filter((item) => item.id !== request.params.id);
-    await writeDatabase(database);
+    await removeLogEntry(request.params.id);
     response.status(204).send();
   });
 
   app.post("/api/users/:userId/log-entries/from-template", async (request, response) => {
-    const database = await readDatabase();
-    const user = database.users.find((item) => item.id === request.params.userId);
+    const user = await findUserById(request.params.userId);
 
     if (!user) {
       sendError(response, 404, "User not found.");
@@ -650,33 +588,31 @@ export function createApp() {
       return;
     }
 
-    const template = database.templates.find(
-      (item) => item.id === request.body.templateId && item.userId === request.params.userId,
-    );
+    const template = await findTemplateById(request.body.templateId);
 
-    if (!template) {
+    if (!template || template.userId !== request.params.userId) {
       sendError(response, 404, "Template not found for this user.");
       return;
     }
 
     const { date, meal, multiplier } = request.body;
-    const items = database.templateItems
-      .filter((item) => item.templateId === template.id)
-      .sort((left, right) => left.lineNumber - right.lineNumber);
+    const items = [...template.items].sort((left, right) => left.lineNumber - right.lineNumber);
 
     if (items.length === 0) {
       sendError(response, 400, "Template must have at least one item before it can be logged.");
       return;
     }
 
-    const invalidItem = items.find((item) => !database.foods.some((food) => food.id === item.foodId));
+    const foods = await listFoods();
+    const foodsById = new Map(foods.map((food) => [food.id, food]));
+    const invalidItem = items.find((item) => !foodsById.has(item.foodId));
     if (invalidItem) {
       sendError(response, 400, "Template contains a food that no longer exists.");
       return;
     }
 
     const createdEntries = items.map((item) => {
-      const food = database.foods.find((candidate) => candidate.id === item.foodId)!;
+      const food = foodsById.get(item.foodId)!;
       return createLogEntryRecord(user.id, food, {
         date,
         meal,
@@ -686,9 +622,7 @@ export function createApp() {
       });
     });
 
-    database.logEntries.push(...createdEntries);
-    await writeDatabase(database);
-    response.status(201).json(createdEntries);
+    response.status(201).json(await insertLogEntries(createdEntries));
   });
 
   return app;
